@@ -1,9 +1,11 @@
 from flask import Flask, request
 import requests
 import os
+import json  
 
 app = Flask(__name__)
 
+# Replace this with your actual bot token or use an environment variable
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8120217348:AAFo7KKaRXPdL-uh43J2sFIP6Ook4bWkHug")
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -16,6 +18,7 @@ def webhook():
     data = request.json
     print("📩 Received:", data, flush=True)
 
+    # Handle normal messages
     if 'message' in data:
         chat_id = data['message']['chat']['id']
         text = data['message'].get('text', '').lower()
@@ -32,6 +35,7 @@ def webhook():
         else:
             send_message(chat_id, "❌ Unknown command. Type /start to begin.")
 
+    # Handle button click (callback query)
     elif 'callback_query' in data:
         callback = data['callback_query']
         chat_id = callback['message']['chat']['id']
@@ -59,7 +63,7 @@ def webhook():
     return {"ok": True}
 
 
-# 🔧 Fixed helper with proper structure
+# ✅ Helper to send message with proper reply_markup formatting
 def send_message(chat_id, text, reply_markup=None):
     payload = {
         "chat_id": chat_id,
@@ -67,7 +71,7 @@ def send_message(chat_id, text, reply_markup=None):
     }
 
     if reply_markup:
-        payload["reply_markup"] = reply_markup
+        payload["reply_markup"] = json.dumps(reply_markup)
 
     response = requests.post(f"{API_URL}/sendMessage", json=payload)
     print("📤 Sent:", response.text, flush=True)
