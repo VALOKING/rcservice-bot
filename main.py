@@ -4,7 +4,6 @@ import os
 
 app = Flask(__name__)
 
-# Set your bot token directly or use env variable
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8120217348:AAFo7KKaRXPdL-uh43J2sFIP6Ook4bWkHug")
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
@@ -17,7 +16,6 @@ def webhook():
     data = request.json
     print("📩 Received:", data, flush=True)
 
-    # Handle normal text messages
     if 'message' in data:
         chat_id = data['message']['chat']['id']
         text = data['message'].get('text', '').lower()
@@ -30,11 +28,10 @@ def webhook():
                     [{"text": "ℹ️ Help", "callback_data": "help"}]
                 ]
             }
-            send_message(chat_id, reply, buttons)
+            send_message(chat_id, reply, reply_markup=buttons)
         else:
             send_message(chat_id, "❌ Unknown command. Type /start to begin.")
 
-    # Handle button click (callback query)
     elif 'callback_query' in data:
         callback = data['callback_query']
         chat_id = callback['message']['chat']['id']
@@ -62,15 +59,15 @@ def webhook():
     return {"ok": True}
 
 
-# Helper function to send messages
-def send_message(chat_id, text, buttons=None):
+# 🔧 Fixed helper with proper structure
+def send_message(chat_id, text, reply_markup=None):
     payload = {
         "chat_id": chat_id,
         "text": text
     }
 
-    if buttons:
-        payload["reply_markup"] = buttons
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
 
     response = requests.post(f"{API_URL}/sendMessage", json=payload)
     print("📤 Sent:", response.text, flush=True)
