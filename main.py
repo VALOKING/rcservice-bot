@@ -9,11 +9,12 @@ app = Flask(__name__)
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8120217348:AAFo7KKaRXPdL-uh43J2sFIP6Ook4bWkHug")
 API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
+# Track user state (per chat_id)
+user_state = {}
 staff = {
     "water": ["Ramesh", "Kumar"],
     "electricity": ["Suresh", "Anil"],
     "road": ["Ganesh", "Vikram"],
-    "general": ["Supervisor"]
 }
 
 @app.route('/')
@@ -27,9 +28,13 @@ def webhook():
 
     if 'message' in data:
         chat_id = data['message']['chat']['id']
-        text = data['message'].get('text', '').lower()
+        text = data['message'].get('text', '')
 
+        state = user_state.get(chat_id, {})
+
+        # 1️⃣ Start
         if text == "/start":
+            user_state.pop(chat_id, None)
             reply = "👋 Welcome! Choose an option:"
             buttons = {
                 "inline_keyboard": [
@@ -37,7 +42,18 @@ def webhook():
                     [{"text": "ℹ️ Help", "callback_data": "help"}]
                 ]
             }
-            send_message(chat_id, reply, reply_markup=buttons)
+            send_message(chat_id, reply, buttons)
+
+        # 2️⃣ Waiting for Description
+        elif state.get("step") == "awaiting_description":
+            user_state[chat_id]["description"] = text
+            user_state[chat_id]["step"] = "awaiting_location"
+            send_message(chat_id, "📍 Please share your location (e.g., Block A, Room 101):")
+
+        # 3️⃣ Waiting for Location
+        elif state.get("step") == "awaiting_location":
+            user_state[chat_id]["location"] = text
+            complete_complaint(chat_id)
 
         else:
             send_message(chat_id, "❌ Unknown command. Type /start to begin.")
@@ -48,7 +64,6 @@ def webhook():
         action = callback['data']
         print("🎯 Callback received:", action, flush=True)
 
-        # When user presses "Make a Complaint"
         if action == "make_complaint":
             reply = "🚨 What type of complaint?"
             buttons = {
@@ -58,25 +73,18 @@ def webhook():
                     [{"text": "🛣️ Road", "callback_data": "type_road"}]
                 ]
             }
-            send_message(chat_id, reply, reply_markup=buttons)
+            send_message(chat_id, reply, buttons)
 
         elif action.startswith("type_"):
-            complaint_type = action.split("_")[1]  # water / electricity / road
-            assigned_staff = random.choice(staff.get(complaint_type, ["Supervisor"]))
-
-            reply = (
-                f"✅ Complaint noted.\n"
-                f"Assigned to: {assigned_staff.title()} ({complaint_type.title()} Department)\n"
-                f"ETA: Within 2 hours"
-            )
-            send_message(chat_id, reply)
+            complaint_type = action.split("_")[1]
+            user_state[chat_id] = {
+                "step": "awaiting_description",
+                "type": complaint_type
+            }
+            send_message(chat_id, "📋 Please describe your issue briefly:")
 
         elif action == "help":
-            reply = (
-                "ℹ️ This is the RC Service Bot.\n"
-                "Use it to raise complaints in your colony.\n"
-                "Tap 'Make a Complaint' to get started."
-            )
+            reply = "ℹ️ Use this bot to raise complaints in your colony. Tap 'Make a Complaint' to begin."
             send_message(chat_id, reply)
 
         else:
@@ -84,12 +92,34 @@ def webhook():
 
     return {"ok": True}
 
+def complete_complaint(chat_id):
+    state = user_state.get(chat_id)
+    if not state:
+        send_message(chat_id, "❌ Something went wrong. Please try again.")
+        return
+
+    complaint_type = state.get("type", "general").title()
+    description = state.get("description", "")
+    location = state.get("location", "")
+    assigned = random.choice(staff.get(state["type"], ["Supervisor"]))
+
+    reply = (
+        f"✅ Complaint noted.\n"
+        f"Type: {complaint_type}\n"
+        f"Description: {description}\n"
+        f"Location: {location}\n"
+        f"Assigned to: {assigned} ({complaint_type} Department)\n"
+        f"ETA: Within 2 hours"
+    )
+
+    send_message(chat_id, reply)
+    user_state.pop(chat_id, None)  # clear state after completion
+
 def send_message(chat_id, text, reply_markup=None):
     payload = {
         "chat_id": chat_id,
         "text": text
     }
-
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
 
