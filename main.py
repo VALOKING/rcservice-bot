@@ -2,7 +2,7 @@ from flask import Flask, request
 import requests
 
 app = Flask(__name__)
-BOT_TOKEN = "PASTE_YOUR_BOT_TOKEN"
+BOT_TOKEN = "8120217348:AAFo7KKaRXPdL-uh43J2sFIP6Ook4bWkHug"
 
 @app.route('/')
 def home():
